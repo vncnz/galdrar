@@ -6,9 +6,16 @@ Please note that this is a personal project, for personal use, developed in my (
 
 ## Notes
 
-cargo run > log.txt 2>&1 is useful to execute and see logs without break the TUI
+cargo run > log.txt 2>&1 is useful to execute and see logs tailing the file
+
+## Usage
+
+- Arrows up and down: scroll text up and down
+- Arrows left and right: subtract/add 1s as time_offset for text highlightning
+- q: exit
 
 ## TODO
+- Remove loading try for "Voice message" and other titles that are not music
 - Consider autoscroll implementing
 - Consider a shift system on click (for position errors or wrong song version)
 - Evaluate https://www.lyricsify.com as alternative lyrics source

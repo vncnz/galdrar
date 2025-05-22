@@ -133,25 +133,36 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
     let mut pos_secs: f64 = 0.0;
     let mut perc: f64 = 0.0;
 
+    let mut time_offset = 0;
+
     loop {
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
-                if key.code == KeyCode::Char('q') {
-                    terminal.clear()?;
-                    let mut stdout = io::stdout();
-                    execute!(stdout, LeaveAlternateScreen)?;
-                    disable_raw_mode()?;
-                    terminal.show_cursor()?;
+                match key.code {
+                    KeyCode::Char('q') => {
+                        terminal.clear()?;
+                        let mut stdout = io::stdout();
+                        execute!(stdout, LeaveAlternateScreen)?;
+                        disable_raw_mode()?;
+                        terminal.show_cursor()?;
 
-                    return Ok(());
-                }
-                if key.code == KeyCode::Down {
-                    vertical_scroll = vertical_scroll.saturating_add(1);
-                    vertical_scroll_state = vertical_scroll_state.position(vertical_scroll);
-                }
-                if key.code == KeyCode::Up {
-                    vertical_scroll = vertical_scroll.saturating_sub(1);
-                    vertical_scroll_state = vertical_scroll_state.position(vertical_scroll);
+                        return Ok(());
+                    },
+                    KeyCode::Down => {
+                        vertical_scroll = vertical_scroll.saturating_add(1);
+                        vertical_scroll_state = vertical_scroll_state.position(vertical_scroll);
+                    },
+                    KeyCode::Up => {
+                        vertical_scroll = vertical_scroll.saturating_sub(1);
+                        vertical_scroll_state = vertical_scroll_state.position(vertical_scroll);
+                    },
+                    KeyCode::Left => {
+                        time_offset -= 1000; // o step configurabile
+                    },
+                    KeyCode::Right => {
+                        time_offset += 1000;
+                    },
+                    _ => {}
                 }
             }
         }
@@ -192,6 +203,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
 
                 last_text = String::new();
                 last_text_with_times = vec![];
+                time_offset = 0;
                 // f.set_title(&running);
                 let rt = tokio::runtime::Runtime::new()?;
 
@@ -223,7 +235,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             if last_text_with_times.len() > 0 {
-                rendered_text = style_text(pos_secs, &last_text_with_times);
+                rendered_text = style_text(pos_secs + (time_offset as f64 / 1000.0), &last_text_with_times);
             }
 
             /* lines.push(line);
@@ -252,7 +264,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 // let [title, artist, album, length, position]: [&str; 5] = chars.as_str().split('|').collect::<Vec<&str>>().try_into().unwrap();
 
                 let perc_100 = perc * 100.0;
-                let to_print = format!("title: {title}\nartist {artist}\nalbum {album}\nlength {length} ({len_secs} secs)\nposition {position} ({pos_secs} secs)\npercentage {perc_100:.0}%");
+                let to_print = format!("title: {title}\nartist {artist}\nalbum {album}\nlength {length} ({len_secs} secs)\nposition {position} ({pos_secs} secs) + offset {time_offset} ms\npercentage {perc_100:.0}%");
                 let paragraph_info = Paragraph::new(to_print).block(block_info);
                 let paragraph = Paragraph::new(rendered_text.clone())
                     .block(block).scroll((vertical_scroll as u16, 0));
