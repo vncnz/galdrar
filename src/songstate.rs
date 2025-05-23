@@ -43,7 +43,7 @@ impl SongState {
             self.title = title;
             self.artist = artist;
             self.album = album;
-            self.length = length.parse().unwrap();
+            self.length = if let Ok(l) = length.parse::<i64>() { l } else { i64::MAX }; //length.parse().unwrap();
             self.len_secs = (self.length as f64) / 1000.0 / 1000.0;
 
             // println!("t:{} a:{} a:{} l:{} p:{}", title, artist, album, length, position);
@@ -65,9 +65,6 @@ impl SongState {
         let time_changed = self.pos_secs != new_pos_secs;
         self.pos_secs = new_pos_secs;
         self.percentage = self.pos_secs / self.len_secs;
-        if (time_changed) {
-            // TODO: update lyrics styles
-        }
         time_changed
     }
 }
