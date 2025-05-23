@@ -1,5 +1,5 @@
-use crossterm::cursor::position;
-use lyric_finder::LyricResult;
+// use crossterm::cursor::position;
+// use lyric_finder::LyricResult;
 use ratatui::{prelude::*, widgets::*};
 use ratatui::text::{Line, Span};
 use reqwest::{Client, ClientBuilder};
@@ -7,42 +7,14 @@ use core::panic;
 use std::{fmt::Error, io::{self, BufRead, BufReader}, process::{Command, Stdio}, sync::mpsc, thread, time::Duration};
 use crossterm::{event::{self, Event, KeyCode}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}};
 use std::io::stdout;
-use serde_derive::Deserialize;
+
 use serde_json;
 
-#[derive(Deserialize)]
-struct LyricLine {
-    seconds: i64,
-    lyrics: String,
-}
+mod songstate;
+use songstate::*;
 
-fn current_lyric_index(position_secs: f64, lyrics: &[LyricLine]) -> Option<usize> {
-    lyrics.iter()
-        .enumerate()
-        .rev()
-        .find(|(_, line)| (line.seconds as f64) <= position_secs)
-        .map(|(i, _)| i)
-}
-
-fn to_human (secs: i64) -> String {
-    format!("{:02}:{:02}", secs / 60, secs % 60)
-}
-
-fn style_text(position_secs: f64, rows: &Vec<LyricLine>) -> Vec<ratatui::text::Line<'static>> {
-    let current_index = if let Some(i) = current_lyric_index(position_secs, &rows) { i } else { 0 };
-    let lines: Vec<Line> = rows.iter().enumerate().map(|(i, line)| {
-        let style = if i == current_index {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default()
-        };
-        Line::from(vec![
-            Span::raw(format!("{} ", to_human(line.seconds))),
-            Span::styled(line.lyrics.clone(), style),
-        ])
-    }).collect();
-    lines
-}
+mod lyrics;
+use lyrics::*;
 
 /* let items: Vec<Spans> = lyrics.iter().enumerate().map(|(i, line)| {
     let prefix = if i == current_index { "➤ " } else { "  " };
@@ -82,6 +54,8 @@ async fn get_json_from_url(url: &str) -> Result<String, reqwest::Error> {
 fn main1() -> Result<(), Box<dyn std::error::Error>> {
     // Channel for communication between reader thread and UI
     let (tx, rx) = mpsc::channel();
+    let mut songinfo = SongState::new();
+    let mut lyrics = Lyrics::new();
 
     // Spawn a thread to read playerctl output
     thread::spawn(move || {
@@ -122,20 +96,9 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
     let mut vertical_scroll: usize = 0;
     let mut vertical_scroll_state = ScrollbarState::new(10);
 
-    let mut lines: Vec<String> = Vec::new();
     let mut running = String::new();
-    let mut last_text = String::new();
-    let mut last_text_with_times: Vec<LyricLine> = vec![];
-    let mut rendered_text: Vec<ratatui::text::Line> = vec![];
-
-    let mut title = String::new();
-    let mut artist = String::new();
-    let mut album = String::new();
-    let mut length = String::new();
-    let mut position = String::new();
-    let mut len_secs: f64 = 0.0;
-    let mut pos_secs: f64 = 0.0;
-    let mut perc: f64 = 0.0;
+    let mut log_text = "Starting...".to_string();
+    // let mut rendered_text: Vec<ratatui::text::Line> = vec![];
 
     let mut time_offset = 0.0;
 
@@ -171,81 +134,49 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        let mut text_changed = false;
+
         // Non-blocking receive
         while let Ok(line) = rx.try_recv() {
-            let mut chars = line.chars();
-            chars.next();
-            chars.next_back();
+            log_text = "Playerctl update received".to_string();
 
-            
-            let values: Vec<String> = chars
-                .as_str()
-                .split('|')
-                .map(|s| s.to_string())
-                .collect();
+            songinfo.update_metadata(&line);
 
-            // println!("{:?}", &values);
-
-            if values.len() == 4 {
-                [title, artist, album, length] =
-                    values.try_into().expect("exactly 4 fields expected");
-
-                // println!("t:{} a:{} a:{} l:{} p:{}", title, artist, album, length, position);
-            } else {
-                // println!("Wrong split result length");
-            }
-
-            if let Ok(ilen) = length.parse::<f64>() {
-                len_secs = ilen / 1000.0 / 1000.0;
-            }
-
-            let new_running = format!("{artist} {title}");
+            let new_running = format!("{} {}", songinfo.artist, songinfo.title);
             if running != new_running {
 
-                last_text = String::new();
-                last_text_with_times = vec![];
-                time_offset = 0.0; // if !pos_secs_incremented { -pos_secs * 1000.0 } else { 0.0 }; // time_offset = 0.0;
+                log_text = "New song".to_string();
+                lyrics.lines = vec![];
+                text_changed = true;
+                time_offset = 0.0;
 
                 running = new_running.clone();
 
-                // f.set_title(&running);
-                let rt = tokio::runtime::Runtime::new()?;
-
-                /* let text = rt.block_on(download_lyrics(&new_running));
-                match text {
-                    Ok(lyric_finder::LyricResult::Some {
-                        track,
-                        artists,
-                        lyric,
-                    }) => {
-                        last_text = lyric;
-                        // println!("{} by {}'s lyric:\n{}", track, artists, lyric)
-                    },
-                    Ok(lyric_finder::LyricResult::None) => { last_text = "".to_string(); println!("lyric not found!") },
-                    Err(e) => { last_text = "".to_string(); println!("Error: {}", e) }
-                } */
-
-                let text = rt.block_on(get_song_from_textyl(&new_running));
-                match text {
-                    Ok(lyric) => {
-                        if let Ok(rows) = serde_json::from_str::<Vec<LyricLine>>(&lyric) {
-                            last_text_with_times = rows;
-                            last_text = "json ok".to_string();
-                        } else {}
-                        // println!("{} by {}'s lyric:\n{}", track, artists, lyric)
-                    },
-                    Err(e) => { last_text = format!("Error: {}", e); }
+                let mut stop = "";
+                if running.contains("Advertisment") { stop = "Advertisement"; }
+                else if running.contains("Voice message") { stop = "Voice message"; }
+                else if songinfo.artist == "" { stop = "No artist"; }
+                if stop == "" {
+                    let rt = tokio::runtime::Runtime::new()?;
+                    let text = rt.block_on(get_song_from_textyl(&new_running));
+                    match text {
+                        Ok(lyric) => {
+                            if let Ok(rows) = serde_json::from_str::<Vec<LyricLine>>(&lyric) {
+                                lyrics.lines = rows;
+                                text_changed = true;
+                                log_text = "lyrics json ok".to_string();
+                            } else {}
+                            // println!("{} by {}'s lyric:\n{}", track, artists, lyric)
+                        },
+                        Err(e) => { log_text = format!("Error: {}", e); }
+                    }
+                } else {
+                    lyrics.lines = vec![];
+                    log_text = stop.to_string();
                 }
+            } else {
+                log_text = "No changes".to_string();
             }
-
-            /* if last_text_with_times.len() > 0 {
-                rendered_text = style_text(pos_secs + (time_offset as f64 / 1000.0), &last_text_with_times);
-            } */
-
-            /* lines.push(line);
-            if lines.len() > 10 {
-                lines.remove(0);
-            } */
         }
 
         let output = Command::new("playerctl")
@@ -256,25 +187,13 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             // .expect("failed to run playerctl for position");
         let position_dirt = String::from_utf8(output.unwrap().stdout).unwrap();
 
-        let mut chars = position_dirt.chars();
-        chars.next();
-        chars.next_back();
-        chars.next_back();
+        let time_changed = songinfo.update_position(&position_dirt);
 
-        position = chars.collect();
-
-        // let mut pos_secs_incremented = false;
-        let mut time_changed: bool = false;
-        if let Ok(ipos) = position.parse::<f64>() {
-            let new_pos_secs = ipos / 1000.0 / 1000.0;
-            // pos_secs_incremented = pos_secs < new_pos_secs;
-            time_changed = pos_secs != new_pos_secs;
-            pos_secs = new_pos_secs;
-            perc = pos_secs / len_secs;
-        }
-
-        if last_text_with_times.len() > 0 && time_changed {
-            rendered_text = style_text(pos_secs + (time_offset as f64 / 1000.0), &last_text_with_times);
+        if lyrics.lines.len() > 0 && (time_changed || text_changed) {
+            // rendered_text = lyrics.style_text(songinfo.pos_secs + (time_offset as f64 / 1000.0));
+            lyrics.update_style_text(songinfo.pos_secs + (time_offset as f64 / 1000.0));
+        } else {
+            // last_text = "No need to refresh".to_string();
         }
 
         terminal.draw(|f| {
@@ -282,30 +201,36 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 .direction(Direction::Vertical)
                 .constraints(vec![
                     Constraint::Length(8),
-                    Constraint::Min(5)
+                    Constraint::Min(5),
+                    Constraint::Length(3)
                 ])
                 .split(f.area());
 
             let block_info = Block::default().title("Playerctl Output").borders(Borders::ALL);
             let block = Block::default().title("Lyrics").borders(Borders::ALL);
+            let block_log = Block::default().title("Log").borders(Borders::ALL);
             // let paragraph = Paragraph::new(lines.clone().join("\n")).block(block);
             // '{{title}}|{{artist}}|{{album}}|{{mpris:length}}|{{position}}'
-            if title != "" {
+            if songinfo.title != "" {
                 // let mut chars = last.chars();
                 // chars.next();
                 // chars.next_back();
                 // let [title, artist, album, length, position]: [&str; 5] = chars.as_str().split('|').collect::<Vec<&str>>().try_into().unwrap();
 
-                let perc_100 = perc * 100.0;
+                // if last_text != "" {} // TODO
+
+                let perc_100 = songinfo.percentage * 100.0;
                 let offset_secs = time_offset / 1000.0;
-                let simulated_pos = pos_secs + offset_secs;
+                let simulated_pos = songinfo.pos_secs + offset_secs;
                 let h_simulated_pos = to_human(simulated_pos as i64);
-                let to_print = format!("title: {title}\nartist {artist}\nalbum {album}\nlength {length} ({len_secs:.1} secs)\nposition {position} ({pos_secs:.1} secs) + offset {offset_secs:.1} secs = {h_simulated_pos}\npercentage {perc_100:.0}%");
+                let to_print = format!("title: {}\nartist {}\nalbum {}\nlength {} ({:.1} secs)\nposition {:.1} secs + offset {:.1} secs = {}\npercentage {:.0}%", songinfo.title, songinfo.artist, songinfo.album, songinfo.length, songinfo.len_secs, songinfo.pos_secs, offset_secs, h_simulated_pos, perc_100);
                 let paragraph_info = Paragraph::new(to_print).block(block_info);
-                let paragraph = Paragraph::new(rendered_text.clone())
+                let paragraph = Paragraph::new(lyrics.rendered_text.clone())
                     .block(block).scroll((vertical_scroll as u16, 0));
+                let paragraph_log = Paragraph::new(log_text.clone()).block(block_log);
                 f.render_widget(paragraph_info, layout[0]);
                 f.render_widget(paragraph, layout[1]);
+                f.render_widget(paragraph_log, layout[2]);
                 f.render_stateful_widget(
                     Scrollbar::new(ScrollbarOrientation::VerticalRight)
                         .begin_symbol(Some("↑"))
@@ -316,7 +241,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             }
         })?;
 
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(16));
     }
 }
 
