@@ -41,13 +41,7 @@ async fn get_song_from_textyl(query: &str) -> Result<String, reqwest::Error> {
 
 async fn get_json_from_url(url: &str) -> Result<String, reqwest::Error> {
     let response = create_insecure_client().get(url).send().await?;
-
-    // let status = response.status();
     let body = response.text().await?;
-
-    // println!("Status: {}", status);
-    // println!("Body:\n{}", body);
-
     Ok(body)
 }
 
@@ -57,14 +51,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
     let mut songinfo = SongState::new();
     let mut lyrics = Lyrics::new();
 
-    // Spawn a thread to read playerctl output
     thread::spawn(move || {
-        /* let child = Command::new("playerctl")
-            .arg("metadata")
-            .arg("--follow")
-            .stdout(Stdio::piped())
-            .spawn()
-            .expect("failed to run playerctl"); */
 
         let child = Command::new("playerctl")
             .arg("metadata")
@@ -212,12 +199,6 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             // let paragraph = Paragraph::new(lines.clone().join("\n")).block(block);
             // '{{title}}|{{artist}}|{{album}}|{{mpris:length}}|{{position}}'
             if songinfo.title != "" {
-                // let mut chars = last.chars();
-                // chars.next();
-                // chars.next_back();
-                // let [title, artist, album, length, position]: [&str; 5] = chars.as_str().split('|').collect::<Vec<&str>>().try_into().unwrap();
-
-                // if last_text != "" {} // TODO
 
                 let perc_100 = songinfo.percentage * 100.0;
                 let offset_secs = time_offset / 1000.0;
