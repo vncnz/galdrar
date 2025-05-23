@@ -24,6 +24,10 @@ fn current_lyric_index(position_secs: f64, lyrics: &[LyricLine]) -> Option<usize
         .map(|(i, _)| i)
 }
 
+fn to_human (secs: i64) -> String {
+    format!("{:02}:{:02}", secs / 60, secs % 60)
+}
+
 fn style_text(position_secs: f64, rows: &Vec<LyricLine>) -> Vec<ratatui::text::Line<'static>> {
     let current_index = if let Some(i) = current_lyric_index(position_secs, &rows) { i } else { 0 };
     let lines: Vec<Line> = rows.iter().enumerate().map(|(i, line)| {
@@ -33,7 +37,7 @@ fn style_text(position_secs: f64, rows: &Vec<LyricLine>) -> Vec<ratatui::text::L
             Style::default()
         };
         Line::from(vec![
-            Span::raw(" "),
+            Span::raw(format!("{} ", to_human(line.seconds))),
             Span::styled(line.lyrics.clone(), style),
         ])
     }).collect();
@@ -92,7 +96,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             .arg("metadata")
             .arg("--follow")
             .arg("--format")
-            .arg("'{{title}}|{{artist}}|{{album}}|{{mpris:length}}|{{position}}'")
+            .arg("'{{title}}|{{artist}}|{{album}}|{{mpris:length}}'")
             .stdout(Stdio::piped())
             .spawn()
             .expect("failed to run playerctl");
@@ -133,7 +137,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
     let mut pos_secs: f64 = 0.0;
     let mut perc: f64 = 0.0;
 
-    let mut time_offset = 0;
+    let mut time_offset = 0.0;
 
     loop {
         if event::poll(Duration::from_millis(100))? {
@@ -157,10 +161,10 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                         vertical_scroll_state = vertical_scroll_state.position(vertical_scroll);
                     },
                     KeyCode::Left => {
-                        time_offset -= 1000; // o step configurabile
+                        time_offset -= 1000.0;
                     },
                     KeyCode::Right => {
-                        time_offset += 1000;
+                        time_offset += 1000.0;
                     },
                     _ => {}
                 }
@@ -182,28 +186,28 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
 
             // println!("{:?}", &values);
 
-            if values.len() == 5 {
-                [title, artist, album, length, position] =
-                    values.try_into().expect("exactly 5 fields expected");
+            if values.len() == 4 {
+                [title, artist, album, length] =
+                    values.try_into().expect("exactly 4 fields expected");
 
                 // println!("t:{} a:{} a:{} l:{} p:{}", title, artist, album, length, position);
             } else {
                 // println!("Wrong split result length");
             }
 
-            if let (Ok(ipos), Ok(ilen)) = (position.parse::<f64>(), length.parse::<f64>()) {
-                perc = ipos / ilen;
+            if let Ok(ilen) = length.parse::<f64>() {
                 len_secs = ilen / 1000.0 / 1000.0;
-                pos_secs = ipos / 1000.0 / 1000.0;
             }
 
             let new_running = format!("{artist} {title}");
             if running != new_running {
-                running = new_running.clone();
 
                 last_text = String::new();
                 last_text_with_times = vec![];
-                time_offset = 0;
+                time_offset = 0.0; // if !pos_secs_incremented { -pos_secs * 1000.0 } else { 0.0 }; // time_offset = 0.0;
+
+                running = new_running.clone();
+
                 // f.set_title(&running);
                 let rt = tokio::runtime::Runtime::new()?;
 
@@ -234,14 +238,43 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            if last_text_with_times.len() > 0 {
+            /* if last_text_with_times.len() > 0 {
                 rendered_text = style_text(pos_secs + (time_offset as f64 / 1000.0), &last_text_with_times);
-            }
+            } */
 
             /* lines.push(line);
             if lines.len() > 10 {
                 lines.remove(0);
             } */
+        }
+
+        let output = Command::new("playerctl")
+            .arg("metadata")
+            .arg("--format")
+            .arg("'{{position}}'")
+            .output();
+            // .expect("failed to run playerctl for position");
+        let position_dirt = String::from_utf8(output.unwrap().stdout).unwrap();
+
+        let mut chars = position_dirt.chars();
+        chars.next();
+        chars.next_back();
+        chars.next_back();
+
+        position = chars.collect();
+
+        // let mut pos_secs_incremented = false;
+        let mut time_changed: bool = false;
+        if let Ok(ipos) = position.parse::<f64>() {
+            let new_pos_secs = ipos / 1000.0 / 1000.0;
+            // pos_secs_incremented = pos_secs < new_pos_secs;
+            time_changed = pos_secs != new_pos_secs;
+            pos_secs = new_pos_secs;
+            perc = pos_secs / len_secs;
+        }
+
+        if last_text_with_times.len() > 0 && time_changed {
+            rendered_text = style_text(pos_secs + (time_offset as f64 / 1000.0), &last_text_with_times);
         }
 
         terminal.draw(|f| {
@@ -264,7 +297,10 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 // let [title, artist, album, length, position]: [&str; 5] = chars.as_str().split('|').collect::<Vec<&str>>().try_into().unwrap();
 
                 let perc_100 = perc * 100.0;
-                let to_print = format!("title: {title}\nartist {artist}\nalbum {album}\nlength {length} ({len_secs} secs)\nposition {position} ({pos_secs} secs) + offset {time_offset} ms\npercentage {perc_100:.0}%");
+                let offset_secs = time_offset / 1000.0;
+                let simulated_pos = pos_secs + offset_secs;
+                let h_simulated_pos = to_human(simulated_pos as i64);
+                let to_print = format!("title: {title}\nartist {artist}\nalbum {album}\nlength {length} ({len_secs:.1} secs)\nposition {position} ({pos_secs:.1} secs) + offset {offset_secs:.1} secs = {h_simulated_pos}\npercentage {perc_100:.0}%");
                 let paragraph_info = Paragraph::new(to_print).block(block_info);
                 let paragraph = Paragraph::new(rendered_text.clone())
                     .block(block).scroll((vertical_scroll as u16, 0));
