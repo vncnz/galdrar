@@ -15,6 +15,5 @@ cargo run > log.txt 2>&1 is useful to execute and see logs tailing the file
 - q: exit
 
 ## TODO
-- Remove loading try for "Voice message" and other titles that are not music (Advertisement)
 - Consider autoscroll implementing
 - Evaluate https://www.lyricsify.com as alternative lyrics source
