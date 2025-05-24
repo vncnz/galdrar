@@ -16,6 +16,9 @@ use songstate::*;
 mod lyrics;
 use lyrics::*;
 
+mod utils;
+use utils::*;
+
 /* let items: Vec<Spans> = lyrics.iter().enumerate().map(|(i, line)| {
     let prefix = if i == current_index { "➤ " } else { "  " };
     Spans::from(vec![
@@ -24,30 +27,10 @@ use lyrics::*;
     ])
 }).collect(); */
 
-
-
-fn create_insecure_client() -> Client {
-    ClientBuilder::new()
-        .danger_accept_invalid_certs(true)  // <-- questa è la riga chiave
-        .timeout(Duration::from_secs(10))
-        .build()
-        .expect("Failed to build insecure client")
-}
-
-async fn get_song_from_textyl(query: &str) -> Result<String, reqwest::Error> {
-    let url = format!("https://api.textyl.co/api/lyrics?q={}", query);
-    get_json_from_url(&url).await
-}
-
-async fn get_json_from_url(url: &str) -> Result<String, reqwest::Error> {
-    let response = create_insecure_client().get(url).send().await?;
-    let body = response.text().await?;
-    Ok(body)
-}
-
 fn main1() -> Result<(), Box<dyn std::error::Error>> {
     // Channel for communication between reader thread and UI
     let (tx, rx) = mpsc::channel();
+    let (tx_lyrics, rx_lyrics) = mpsc::channel();
     let mut songinfo = SongState::new();
     let mut lyrics = Lyrics::new();
 
@@ -146,6 +129,17 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 if stop == "" {
                     let rt = tokio::runtime::Runtime::new()?;
                     let text = rt.block_on(get_song_from_textyl(&new_running));
+
+                    /* let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.spawn({
+                        let tx_lyrics_cloned = tx_lyrics.clone();
+                        async move {
+                            if let Ok(lines) = Lyrics::fetch_lyrics(&new_running).await {
+                                tx_lyrics_cloned.send(lines).expect("Error sending lyrics");
+                            }
+                        }
+                    }); */
+
                     match text {
                         Ok(lyric) => {
                             if let Ok(rows) = serde_json::from_str::<Vec<LyricLine>>(&lyric) {
@@ -166,6 +160,12 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        let mut lyrics_updated = false;
+        while let Ok(lines) = rx_lyrics.try_recv() {
+            lyrics.set_text(lines);
+            lyrics_updated = true;
+        }
+
         let output = Command::new("playerctl")
             .arg("metadata")
             .arg("--format")
@@ -176,7 +176,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
 
         let time_changed = songinfo.update_position(&position_dirt);
 
-        if lyrics.lines.len() > 0 && (time_changed || text_changed) {
+        if lyrics.lines.len() > 0 && (time_changed || lyrics_updated) {
             // rendered_text = lyrics.style_text(songinfo.pos_secs + (time_offset as f64 / 1000.0));
             lyrics.update_style_text(songinfo.pos_secs + (time_offset as f64 / 1000.0));
         } else {
