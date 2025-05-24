@@ -143,7 +143,8 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                     match text {
                         Ok(lyric) => {
                             if lyric == "No lyrics available" {
-                                lyrics.lines = vec![];
+                                let fake = LyricLine { seconds: 0, lyrics: "No lyrics available".to_string() };
+                                lyrics.lines = vec![fake];
                                 log_text = "No lyrics available".to_string();
                             } else if let Ok(rows) = serde_json::from_str::<Vec<LyricLine>>(&lyric) {
                                 lyrics.lines = rows;
