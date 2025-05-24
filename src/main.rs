@@ -123,9 +123,21 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 running = new_running.clone();
 
                 let mut stop = "";
-                if running.contains("Advertisment") { stop = "Advertisement"; }
-                else if running.contains("Voice message") { stop = "Voice message"; }
-                else if songinfo.artist == "" { stop = "No artist"; }
+                if running.contains("Advertisment") {
+                    let fake = LyricLine { seconds: 0, lyrics: "Oh, another advertisment!".to_string() };
+                    lyrics.lines = vec![fake];
+                    stop = "Advertisement";
+                }
+                else if running.contains("Voice message") {
+                    let fake = LyricLine { seconds: 0, lyrics: "Not a song!".to_string() };
+                    lyrics.lines = vec![fake];
+                    stop = "Voice message";
+                }
+                else if songinfo.artist == "" {
+                    let fake = LyricLine { seconds: 0, lyrics: "No artist: not a song, maybe?".to_string() };
+                    lyrics.lines = vec![fake];
+                    stop = "No artist";
+                }
                 if stop == "" {
                     let rt = tokio::runtime::Runtime::new()?;
                     let text = rt.block_on(get_song_from_textyl(&new_running));
