@@ -142,11 +142,16 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
 
                     match text {
                         Ok(lyric) => {
-                            if let Ok(rows) = serde_json::from_str::<Vec<LyricLine>>(&lyric) {
+                            if lyric == "No lyrics available" {
+                                lyrics.lines = vec![];
+                                log_text = "No lyrics available".to_string();
+                            } else if let Ok(rows) = serde_json::from_str::<Vec<LyricLine>>(&lyric) {
                                 lyrics.lines = rows;
                                 text_changed = true;
                                 log_text = "lyrics json ok".to_string();
-                            } else {}
+                            } else {
+                                log_text = format!("Json conversion NOT OK: {}", lyric);
+                            }
                             // println!("{} by {}'s lyric:\n{}", track, artists, lyric)
                         },
                         Err(e) => { log_text = format!("Error: {}", e); }
