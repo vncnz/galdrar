@@ -207,7 +207,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             let layout = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(vec![
-                    Constraint::Length(8),
+                    Constraint::Length(6),
                     Constraint::Min(5),
                     Constraint::Length(3)
                 ])
@@ -224,7 +224,9 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 let offset_secs = time_offset / 1000.0;
                 let simulated_pos = songinfo.pos_secs + offset_secs;
                 let h_simulated_pos = to_human(simulated_pos as i64);
-                let to_print = format!("title: {}\nartist {}\nalbum {}\nlength {} ({:.1} secs)\nposition {:.1} secs + offset {:.1} secs = {}\npercentage {:.0}%", songinfo.title, songinfo.artist, songinfo.album, songinfo.length, songinfo.len_secs, songinfo.pos_secs, offset_secs, h_simulated_pos, perc_100);
+                let h_length = to_human(songinfo.len_secs as i64);
+                // let to_print = format!("title: {}\nartist {}\nalbum {}\nlength {:.1} secs = {}\nposition {:.1} secs + offset {:.1} secs = {}\npercentage {:.0}%", songinfo.title, songinfo.artist, songinfo.album, songinfo.len_secs, h_length, songinfo.pos_secs, offset_secs, h_simulated_pos, perc_100);
+                let to_print = format!("title: {}\nartist {}\nalbum {}\n{} / {} ({:.0}%, offset {}s)", songinfo.title, songinfo.artist, songinfo.album, h_simulated_pos, h_length, perc_100, offset_secs);
                 let paragraph_info = Paragraph::new(to_print).block(block_info);
                 let paragraph = Paragraph::new(lyrics.rendered_text.clone())
                     .block(block).scroll((vertical_scroll as u16, 0));
