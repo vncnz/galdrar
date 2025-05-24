@@ -117,6 +117,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
 
                 log_text = "New song".to_string();
                 lyrics.lines = vec![];
+                vertical_scroll_state = vertical_scroll_state.content_length(lyrics.lines.len());
                 text_changed = true;
                 time_offset = 0.0;
 
@@ -176,6 +177,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 log_text = "No changes".to_string();
             }
+            vertical_scroll_state = vertical_scroll_state.content_length(lyrics.lines.len());
         }
 
         let mut lyrics_updated = false;
