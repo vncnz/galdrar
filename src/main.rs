@@ -94,10 +94,10 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                         vertical_scroll_state = vertical_scroll_state.position(vertical_scroll);
                     },
                     KeyCode::Left => {
-                        time_offset -= 1000.0;
+                        time_offset -= 500.0;
                     },
                     KeyCode::Right => {
-                        time_offset += 1000.0;
+                        time_offset += 500.0;
                     },
                     _ => {}
                 }
