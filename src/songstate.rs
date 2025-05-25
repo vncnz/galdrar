@@ -1,3 +1,5 @@
+use std::{io::{BufRead, BufReader}, process::{Command, Stdio}, sync::mpsc::Sender, thread};
+
 
 
 pub struct SongState {
@@ -66,5 +68,41 @@ impl SongState {
         self.pos_secs = new_pos_secs;
         self.percentage = self.pos_secs / self.len_secs;
         time_changed
+    }
+
+    pub fn check_and_update_position(&mut self) -> bool {
+        let output = Command::new("playerctl")
+            .arg("metadata")
+            .arg("--format")
+            .arg("'{{position}}'")
+            .output();
+            // .expect("failed to run playerctl for position");
+        let position_dirt = String::from_utf8(output.unwrap().stdout).unwrap();
+        self.update_position(&position_dirt)
+    }
+
+    pub fn listen_to_playerctl (&mut self, tx: Sender<String>) {
+        thread::spawn(move || {
+
+            let child = Command::new("playerctl")
+                .arg("metadata")
+                .arg("--follow")
+                .arg("--format")
+                .arg("'{{title}}|{{artist}}|{{album}}|{{mpris:length}}'")
+                .stdout(Stdio::piped())
+                .spawn()
+                .expect("failed to run playerctl");
+
+            let stdout = child.stdout.expect("no stdout");
+            let reader = BufReader::new(stdout);
+
+            for line in reader.lines() {
+                if let Ok(l) = line {
+                    if tx.send(l).is_err() {
+                        break;
+                    }
+                }
+            }
+        });
     }
 }

@@ -33,6 +33,7 @@ impl Lyrics {
             .map(|(i, _)| i)
     }
 
+    // TODO: cache current_index and don't restyle all if not changed
     fn style_text(&mut self, position_secs: f64) -> Vec<ratatui::text::Line<'static>> {
         let current_index = if let Some(i) = self.current_lyric_index(position_secs) { i } else { 0 };
         let lines: Vec<Line> = self.lines.iter().enumerate().map(|(i, line)| {

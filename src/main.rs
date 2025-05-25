@@ -1,9 +1,6 @@
-// use crossterm::cursor::position;
-// use lyric_finder::LyricResult;
 use ratatui::{prelude::*, widgets::*};
-use ratatui::text::{Line, Span};
-use reqwest::{Client, ClientBuilder};
-use core::panic;
+// use ratatui::text::{Line, Span};
+// use reqwest::{Client, ClientBuilder};
 use std::{fmt::Error, io::{self, BufRead, BufReader}, process::{Command, Stdio}, sync::mpsc, thread, time::Duration};
 use crossterm::{event::{self, Event, KeyCode}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}};
 use std::io::stdout;
@@ -19,14 +16,6 @@ use lyrics::*;
 mod utils;
 use utils::*;
 
-/* let items: Vec<Spans> = lyrics.iter().enumerate().map(|(i, line)| {
-    let prefix = if i == current_index { "➤ " } else { "  " };
-    Spans::from(vec![
-        Span::styled(prefix, Style::default().fg(Color::Gray)),
-        Span::raw(&line.frase),
-    ])
-}).collect(); */
-
 fn main1() -> Result<(), Box<dyn std::error::Error>> {
     // Channel for communication between reader thread and UI
     let (tx, rx) = mpsc::channel();
@@ -34,7 +23,9 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
     let mut songinfo = SongState::new();
     let mut lyrics = Lyrics::new();
 
-    thread::spawn(move || {
+    songinfo.listen_to_playerctl(tx);
+
+    /*thread::spawn(move || {
 
         let child = Command::new("playerctl")
             .arg("metadata")
@@ -55,7 +46,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-    });
+    });*/
 
     // Terminal setup
     enable_raw_mode()?;
@@ -116,9 +107,9 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             if running != new_running {
 
                 log_text = "New song".to_string();
-                lyrics.lines = vec![];
+                // lyrics.lines = vec![];
                 vertical_scroll_state = vertical_scroll_state.content_length(lyrics.lines.len());
-                text_changed = true;
+                // text_changed = true;
                 time_offset = 0.0;
 
                 running = new_running.clone();
@@ -140,18 +131,9 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                     stop = "No artist";
                 }
                 if stop == "" {
+                    // This is ok
                     let rt = tokio::runtime::Runtime::new()?;
                     let text = rt.block_on(get_song_from_textyl(&new_running));
-
-                    /* let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.spawn({
-                        let tx_lyrics_cloned = tx_lyrics.clone();
-                        async move {
-                            if let Ok(lines) = Lyrics::fetch_lyrics(&new_running).await {
-                                tx_lyrics_cloned.send(lines).expect("Error sending lyrics");
-                            }
-                        }
-                    }); */
 
                     match text {
                         Ok(lyric) => {
@@ -170,6 +152,26 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                         },
                         Err(e) => { log_text = format!("Error: {}", e); }
                     }
+
+                    // this is not ok...
+                    /* log_text = "Fetching lyrics...".to_string();
+                    let rt = tokio::runtime::Runtime::new().unwrap();
+                    rt.spawn({
+                        let tx_lyrics_cloned = tx_lyrics.clone();
+                        async move {
+                            let ret = Lyrics::fetch_lyrics(&new_running).await;
+                            if let Ok(lines) = ret {
+                                tx_lyrics_cloned.send(lines).expect("Error sending lyrics");
+                            } else if let Err(err) = ret {
+                                let fake = LyricLine { seconds: 0, lyrics: format!("Textyl error? {}", err) };
+                                // lyrics.lines = vec![fake];
+                                tx_lyrics_cloned.send(vec![fake]).expect("Error getting lyrics");
+                                // log_text = format!("{}", err);
+                                println!("Textyl error: {}", err);
+                            }
+                        }
+                    });
+                    log_text = "Fetching lyrics spawned".to_string(); */
                 } else {
                     lyrics.lines = vec![];
                     log_text = stop.to_string();
@@ -184,19 +186,11 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
         while let Ok(lines) = rx_lyrics.try_recv() {
             lyrics.set_text(lines);
             lyrics_updated = true;
+            log_text = format!("Lyrics update received ({} lines)", lyrics.lines.len());
         }
+        let time_changed = songinfo.check_and_update_position();
 
-        let output = Command::new("playerctl")
-            .arg("metadata")
-            .arg("--format")
-            .arg("'{{position}}'")
-            .output();
-            // .expect("failed to run playerctl for position");
-        let position_dirt = String::from_utf8(output.unwrap().stdout).unwrap();
-
-        let time_changed = songinfo.update_position(&position_dirt);
-
-        if lyrics.lines.len() > 0 && (time_changed || lyrics_updated) {
+        if lyrics.lines.len() > 0 && (time_changed || text_changed || lyrics_updated) {
             // rendered_text = lyrics.style_text(songinfo.pos_secs + (time_offset as f64 / 1000.0));
             lyrics.update_style_text(songinfo.pos_secs + (time_offset as f64 / 1000.0));
         } else {
@@ -245,25 +239,6 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
         })?;
 
         thread::sleep(Duration::from_millis(16));
-    }
-}
-
-async fn download_lyrics (searc_query: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let client =  lyric_finder::Client::new();
-    let result = client.get_lyric(searc_query).await?;
-    match result {
-        lyric_finder::LyricResult::Some {
-            track,
-            artists,
-            lyric,
-        } => {
-            // println!("{} by {}'s lyric:\n{}", track, artists, lyric);
-            Ok(lyric)
-        }
-        lyric_finder::LyricResult::None => {
-            // println!("lyric not found!");
-            panic!("lyric not found!")
-        }
     }
 }
 
