@@ -67,7 +67,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Char('q') => {
+                    KeyCode::Char('q') | KeyCode::Esc => {
                         terminal.clear()?;
                         let mut stdout = io::stdout();
                         execute!(stdout, LeaveAlternateScreen)?;

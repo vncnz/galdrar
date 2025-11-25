@@ -23,7 +23,7 @@ pub fn to_human (secs: i64) -> String {
 
 fn create_insecure_client() -> Client {
     ClientBuilder::new()
-        .danger_accept_invalid_certs(true)  // <-- questa è la riga chiave
+        .danger_accept_invalid_certs(true)
         .timeout(Duration::from_secs(10))
         .build()
         .expect("Failed to build insecure client")

@@ -9,10 +9,9 @@ This program logs to file, because the terminal output is used by TUI. The file 
 Lyrics are downloaded from [lrclib](https://lrclib.net) APIs.
 
 ## Usage
-
 - Arrows up and down: scroll text up and down
-- Arrows left and right: subtract/add a time offset for text highlightning
-- q: exit
+- Arrows left and right: subtract/add 500ms as time offset for text highlightning
+- q or Esc: exit
 
 ## TODO
 - Consider autoscroll implementing
