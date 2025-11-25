@@ -105,6 +105,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
 
             let new_running = format!("{} {}", songinfo.artist, songinfo.title);
             if running != new_running {
+                log_to_file("New song".into());
 
                 log_text = "New song".to_string();
                 // lyrics.lines = vec![];
@@ -119,21 +120,26 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                     let fake = LyricLine { seconds: 0, lyrics: "Oh, another advertisment!".to_string() };
                     lyrics.lines = vec![fake];
                     stop = "Advertisement";
+                    log_to_file("Advertisement recognized".into());
                 }
                 else if running.contains("Voice message") {
                     let fake = LyricLine { seconds: 0, lyrics: "Not a song!".to_string() };
                     lyrics.lines = vec![fake];
                     stop = "Voice message";
+                    log_to_file("Voice message recognized".into());
                 }
                 else if songinfo.artist == "" {
                     let fake = LyricLine { seconds: 0, lyrics: "No artist: not a song, maybe?".to_string() };
                     lyrics.lines = vec![fake];
                     stop = "No artist";
+                    log_to_file("No artist".into());
                 }
                 if stop == "" {
                     // This is ok
                     let rt = tokio::runtime::Runtime::new()?;
-                    let text = rt.block_on(get_song_from_textyl(&new_running));
+                    // let text = rt.block_on(get_song_from_textyl(&new_running));
+                    log_to_file(format!("title: {} artist: {} album: {} length: {}", &songinfo.title, &songinfo.artist, &songinfo.album, songinfo.len_secs));
+                    let text = rt.block_on(get_song_from_rlclib(&songinfo.title, &songinfo.artist, &songinfo.album, songinfo.len_secs));
 
                     match text {
                         Ok(lyric) => {
@@ -141,16 +147,24 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                                 let fake = LyricLine { seconds: 0, lyrics: "No lyrics available".to_string() };
                                 lyrics.lines = vec![fake];
                                 log_text = "No lyrics available".to_string();
+                                log_to_file(log_text.clone());
                             } else if let Ok(rows) = serde_json::from_str::<Vec<LyricLine>>(&lyric) {
                                 lyrics.lines = rows;
                                 text_changed = true;
-                                log_text = "lyrics json ok".to_string();
+                                log_text = "lyrics json ok (1)".to_string();
+                                log_to_file(log_text.clone());
+                            } else if let Some(rows) = convert_text(&lyric) {
+                                lyrics.lines = rows;
+                                text_changed = true;
+                                log_text = "Lyrics loaded and parsed successfully".to_string();
+                                log_to_file(log_text.clone());
                             } else {
-                                log_text = format!("Json conversion NOT OK: {}", lyric);
+                                log_text = format!("Something's wrong");
+                                log_to_file(log_text.clone());
                             }
                             // println!("{} by {}'s lyric:\n{}", track, artists, lyric)
                         },
-                        Err(e) => { log_text = format!("Error: {}", e); }
+                        Err(e) => { log_text = "Error".into(); log_to_file(format!("Error: {}", e)); }
                     }
 
                     // this is not ok...
@@ -209,7 +223,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
 
             let block_info = Block::default().title("Playerctl Output").borders(Borders::ALL);
             let block = Block::default().title("Lyrics").borders(Borders::ALL);
-            let block_log = Block::default().title("Log").borders(Borders::ALL);
+            let block_log = Block::default().title("Status").borders(Borders::ALL);
             // let paragraph = Paragraph::new(lines.clone().join("\n")).block(block);
             // '{{title}}|{{artist}}|{{album}}|{{mpris:length}}|{{position}}'
             if songinfo.title != "" {

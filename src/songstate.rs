@@ -78,7 +78,8 @@ impl SongState {
             .output();
             // .expect("failed to run playerctl for position");
         let position_dirt = String::from_utf8(output.unwrap().stdout).unwrap();
-        self.update_position(&position_dirt)
+        if position_dirt != "" { self.update_position(&position_dirt) }
+        else { false }
     }
 
     pub fn listen_to_playerctl (&mut self, tx: Sender<String>) {
