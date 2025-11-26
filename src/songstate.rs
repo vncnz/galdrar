@@ -237,10 +237,12 @@ pub fn listen_to_playerctl(
                         s.lyrics.lines = vec![fake];
                     }
                     let maybe_server_response = get_song_blocking(&title, &artist, &album, duration);
-                    if updated && let Ok(mut s) = state.lock() {
-                        let status = s.apply_song_text(maybe_server_response);
-                        // Notifica che lo stato è cambiato
-                        let _ = tx_notify.send(status);
+                    if updated {
+                        if let Ok(mut s) = state.lock() {
+                            let status = s.apply_song_text(maybe_server_response);
+                            // Notifica che lo stato è cambiato
+                            let _ = tx_notify.send(status);
+                        }
                     }
                 } else {
                     log_to_file("Metadata NOT updated".to_string());
