@@ -45,8 +45,8 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
     let mut time_offset = 0.0;
 
     let songinfo_mux_clone = songinfo_mux.clone();
+    let mut status: String = "".to_string();
     loop {
-        let mut status: String = "".to_string();
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
@@ -84,23 +84,21 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
         let mut songinfo = songinfo_mux_clone.lock().unwrap();
 
         // Non-blocking receive
-        while let Ok(_line) = rx.try_recv() { // TODO: line is intended to be used in near future
+        while let Ok(line) = rx.try_recv() {
+            log_to_file(format!("EVENT: {line}"));
             text_changed = true;
             lyrics_updated = true;
-            // log_text = "Playerctl update received".to_string();
+            time_offset = 0.0;
+            status = format!("{line}");
 
-            let new_running = format!("{} {}", songinfo.artist, songinfo.title);
+            /* let new_running = format!("{} {}", songinfo.artist, songinfo.title);
             if running != new_running {
                 log_to_file("New song".into());
 
                 vertical_scroll_state = vertical_scroll_state.content_length(songinfo.lyrics.lines.len());
-                // text_changed = true;
-                time_offset = 0.0;
-
                 running = new_running.clone();
-
                 
-                if running.contains("Advertisment") {
+                / * if running.contains("Advertisment") {
                     let fake = LyricLine { seconds: 0, lyrics: "Oh, another advertisment!".to_string() };
                     songinfo.lyrics.lines = vec![fake];
                     status = "Advertisement".into();
@@ -119,48 +117,11 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                     log_to_file("No artist".into());
                 }
                 else {
-                    // This is a song
-                    /* let rt = tokio::runtime::Runtime::new()?;
-                    log_to_file(format!("title: {} artist: {} album: {} length: {}", &songinfo.title, &songinfo.artist, &songinfo.album, songinfo.len_secs));
-                    songinfo.lyrics_state = LyricsState::Loading;
-                    let maybe_server_response = rt.block_on(get_song_from_rlclib(&songinfo.title, &songinfo.artist, &songinfo.album, songinfo.len_secs));
-
-                    match maybe_server_response {
-                        Ok(server_response) => {
-                            log_to_file(server_response.clone());
-                            let parsed: Value = serde_json::from_str(&server_response).unwrap();
-                            if let Some(status_code) = parsed.get("statusCode") { // API error
-                                // Example: {"message":"Failed to find specified track","name":"TrackNotFound","statusCode":404}
-                                status = parsed["message"].as_str().unwrap().to_string();
-                                log_to_file(format!("status: {status_code} {status}"));
-                                songinfo.lyrics_state = LyricsState::Invalidated;
-                            } else if let Some(synced) = parsed.get("syncedLyrics") { // We have the lyrics!
-                                if songinfo.lyrics.convert_text(synced.as_str().unwrap()) {
-                                    text_changed = true;
-                                    status = "Lyrics loaded and parsed successfully".into();
-                                    log_to_file(status.clone());
-                                    songinfo.lyrics_state = LyricsState::Loaded;
-                                } else {
-                                    status = "Something's wrong (1)".into();
-                                    log_to_file(status.clone());
-                                    songinfo.lyrics_state = LyricsState::Invalidated;
-                                }
-                            } else {
-                                status = "Something's wrong (2)".into();
-                                log_to_file(status.clone());
-                                songinfo.lyrics_state = LyricsState::Invalidated;
-                            }
-                        },
-                        Err(e) => {
-                            songinfo.lyrics_state = LyricsState::Invalidated;
-                            status = "Error".into();
-                            log_to_file(format!("Error: {}", e));
-                        }
-                    } */
-                }
+                    // This is a song - moved
+                } * /
             } else {
                 status = "No changes".into();
-            }
+            } */
 
             vertical_scroll_state = vertical_scroll_state.content_length(songinfo.lyrics.lines.len());
         }

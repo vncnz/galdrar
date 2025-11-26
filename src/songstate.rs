@@ -127,6 +127,7 @@ impl SongState {
     } */
 
     pub fn apply_song_text (&mut self, maybe_server_response: Result<String, reqwest::Error>) -> String {
+        // TODO Manage the case syncedLyrics is null and plainLyrics is not null
         let mut status: String = String::new();
 
         match maybe_server_response {
@@ -230,18 +231,28 @@ pub fn listen_to_playerctl(
                 }
                 if updated {
                     log_to_file("Metadata updated".to_string());
-                    let _ = tx_notify.send("Fetching".to_string());
-
                     if let Ok(mut s) = state.lock() {
-                        let fake = LyricLine { seconds: 0, lyrics: "Fetching text".to_string() };
-                        s.lyrics.lines = vec![fake];
+                        // let fake = LyricLine { seconds: 0, lyrics: "Fetching text".to_string() };
+                        s.lyrics.reset();
                     }
-                    let maybe_server_response = get_song_blocking(&title, &artist, &album, duration);
-                    if updated {
-                        if let Ok(mut s) = state.lock() {
-                            let status = s.apply_song_text(maybe_server_response);
-                            // Notifica che lo stato è cambiato
-                            let _ = tx_notify.send(status);
+                    if duration < 1.0 || duration > 3600.0 {
+                        let _ = tx_notify.send(format!("Wrong length {duration}"));
+                    } else if artist == "" {
+                        let _ = tx_notify.send("No artist".into());
+                    } else {
+                        let _ = tx_notify.send("Fetching".to_string());
+
+                        /* if let Ok(mut s) = state.lock() {
+                            let fake = LyricLine { seconds: 0, lyrics: "Fetching text".to_string() };
+                            s.lyrics.lines = vec![fake];
+                        } */
+                        let maybe_server_response = get_song_blocking(&title, &artist, &album, duration);
+                        if updated {
+                            if let Ok(mut s) = state.lock() {
+                                let status = s.apply_song_text(maybe_server_response);
+                                // Notifica che lo stato è cambiato
+                                let _ = tx_notify.send(status);
+                            }
                         }
                     }
                 } else {

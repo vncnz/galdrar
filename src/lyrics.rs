@@ -25,6 +25,12 @@ impl Lyrics {
         }
     }
 
+    pub fn reset (&mut self) {
+        self.lines = vec![];
+        self.rendered_text = vec![];
+        self.rendered_index = 1000000;
+    }
+
     fn current_lyric_index(&mut self, position_secs: f64) -> usize {
         self.lines.iter()
             .enumerate()

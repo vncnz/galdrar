@@ -15,13 +15,8 @@ Lyrics are downloaded from [lrclib](https://lrclib.net) APIs.
 
 ## TODO
 - Consider autoscroll implementing
+- Consider multi-player management
 
 ## Known bug (to be fixed soon)
-First song loading is tried when there is a wrong length as metadata. Length is fixed within seconds, when play starts, but the network request is already running with the wrong query data.
-For example, this is a log trace:
-
-[22:55:13.023] title: Boulevard of Broken Dreams artist: Green Day album: American Idiot (20th Anniversary Deluxe Edition) length: 9223372036854.775
-[22:55:17.967] syncedLyrics NOT found
-[22:55:17.967] {"message":"duration: must be between 1 and 3600","name":"ValidationError","statusCode":400}
-[22:55:17.967] No lines produced
-[22:55:17.967] Something's wrong
+- Manage the case syncedLyrics is null and plainLyrics is not null (now panics!)
+- The loaded lyrics is shown when time reaches the first line
