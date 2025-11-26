@@ -7,7 +7,7 @@ edition = "2024"
 ratatui = "0.28"
 crossterm = "0.27"
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 
 lyric_finder = "0.2.0"
 futures = "0.3"
