@@ -126,7 +126,7 @@ impl SongState {
         }
     } */
 
-    pub fn apply_song_text (&mut self, maybe_server_response: Result<String, reqwest::Error>) {
+    pub fn apply_song_text (&mut self, maybe_server_response: Result<String, reqwest::Error>) -> String {
         let mut status: String = String::new();
 
         match maybe_server_response {
@@ -162,6 +162,7 @@ impl SongState {
             }
         }
         log_to_file(format!("NEW: {status}"));
+        status
     }
 
     /* pub fn listen_to_playerctl (&mut self, tx: Sender<String>) {
@@ -193,7 +194,7 @@ impl SongState {
 
 pub fn listen_to_playerctl(
     state: Arc<Mutex<SongState>>,
-    tx_notify: Sender<()>
+    tx_notify: Sender<String>
 ) {
     thread::spawn(move || {
         let child = Command::new("playerctl")
@@ -221,7 +222,7 @@ pub fn listen_to_playerctl(
                 // Lock dello stato
                 if let Ok(mut s) = state.lock() {
                     updated = s.update_metadata(&l);
-                    let _ = tx_notify.send(());
+                    let _ = tx_notify.send("Fetching".to_string());
                     title = s.title.clone();
                     artist = s.artist.clone();
                     album = s.album.clone();
@@ -233,9 +234,9 @@ pub fn listen_to_playerctl(
                 }
                 let maybe_server_response = get_song_blocking(&title, &artist, &album, duration);
                 if updated && let Ok(mut s) = state.lock() {
-                    s.apply_song_text(maybe_server_response);
+                    let status = s.apply_song_text(maybe_server_response);
                     // Notifica che lo stato è cambiato
-                    let _ = tx_notify.send(());
+                    let _ = tx_notify.send(status);
                 }
             }
         }
