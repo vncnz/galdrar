@@ -222,21 +222,28 @@ pub fn listen_to_playerctl(
                 // Lock dello stato
                 if let Ok(mut s) = state.lock() {
                     updated = s.update_metadata(&l);
-                    let _ = tx_notify.send("Fetching".to_string());
+
                     title = s.title.clone();
                     artist = s.artist.clone();
                     album = s.album.clone();
                     duration = s.len_secs;
                 }
-                if let Ok(mut s) = state.lock() {
-                    let fake = LyricLine { seconds: 0, lyrics: "Fetching text".to_string() };
-                    s.lyrics.lines = vec![fake];
-                }
-                let maybe_server_response = get_song_blocking(&title, &artist, &album, duration);
-                if updated && let Ok(mut s) = state.lock() {
-                    let status = s.apply_song_text(maybe_server_response);
-                    // Notifica che lo stato è cambiato
-                    let _ = tx_notify.send(status);
+                if updated {
+                    log_to_file("Metadata updated".to_string());
+                    let _ = tx_notify.send("Fetching".to_string());
+
+                    if let Ok(mut s) = state.lock() {
+                        let fake = LyricLine { seconds: 0, lyrics: "Fetching text".to_string() };
+                        s.lyrics.lines = vec![fake];
+                    }
+                    let maybe_server_response = get_song_blocking(&title, &artist, &album, duration);
+                    if updated && let Ok(mut s) = state.lock() {
+                        let status = s.apply_song_text(maybe_server_response);
+                        // Notifica che lo stato è cambiato
+                        let _ = tx_notify.send(status);
+                    }
+                } else {
+                    log_to_file("Metadata NOT updated".to_string());
                 }
             }
         }
