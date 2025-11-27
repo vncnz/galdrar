@@ -18,11 +18,10 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 fn main1() -> Result<(), Box<dyn std::error::Error>> {
+    log_to_file("Started".into());
+
     // Channel for communication between reader thread and UI
     let (tx, rx) = mpsc::channel();
-    // let (tx_lyrics, rx_lyrics) = mpsc::channel();
-    // let mut songinfo = SongState::new();
-    // let mut lyrics = Lyrics::new();
 
     let songinfo_mux = Arc::new(Mutex::new(SongState::new()));
     // let (tx_notify, rx_notify) = std::sync::mpsc::channel();
@@ -36,11 +35,6 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
     terminal.clear()?;
     let mut vertical_scroll: usize = 0;
     let mut vertical_scroll_state = ScrollbarState::new(10);
-
-    let mut running = String::new();
-    // let mut log_text = "Starting...".to_string();
-    
-    // let mut rendered_text: Vec<ratatui::text::Line> = vec![];
 
     let mut time_offset = 0.0;
 
@@ -161,7 +155,6 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             // let paragraph = Paragraph::new(lines.clone().join("\n")).block(block);
             // '{{title}}|{{artist}}|{{album}}|{{mpris:length}}|{{position}}'
             if songinfo.title != "" {
-
                 let perc_100 = songinfo.percentage * 100.0;
                 let offset_secs = time_offset / 1000.0;
                 let simulated_pos = songinfo.pos_secs + offset_secs;
@@ -183,6 +176,9 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                     layout[1],
                     &mut vertical_scroll_state
                 )
+            } else {
+                let paragraph_nodata = Paragraph::new("No data").block(block_log);
+                f.render_widget(paragraph_nodata, layout[2]);
             }
         })?;
 

@@ -193,7 +193,7 @@ impl SongState {
     } */
 }
 
-pub fn listen_to_playerctl(
+pub fn listen_to_playerctl_OLD(
     state: Arc<Mutex<SongState>>,
     tx_notify: Sender<String>
 ) {
@@ -261,4 +261,155 @@ pub fn listen_to_playerctl(
             }
         }
     });
+}
+
+use std::time::Duration;
+pub fn listen_to_playerctl(
+    state: Arc<Mutex<SongState>>,
+    tx_notify: Sender<String>
+) {
+    thread::spawn(move || {
+        let mut last_track_key: String = String::new(); // per rilevare cambi canzone
+        let mut last_active_player: String = String::new();
+
+        loop {
+            thread::sleep(Duration::from_millis(900));
+
+            // 1. Ottieni elenco player
+            let players_out = Command::new("playerctl")
+                .arg("--list-all")
+                .output();
+
+            let players_raw = match players_out {
+                Ok(out) => String::from_utf8_lossy(&out.stdout).to_string(),
+                Err(_) => continue,
+            };
+
+            let players: Vec<String> = players_raw
+                .lines()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            if players.is_empty() {
+                continue;
+            }
+
+            // 2. Trova un player in stato "Playing"
+            let mut active: Option<String> = None;
+
+            for p in &players {
+                let status_out = Command::new("playerctl")
+                    .arg("-p").arg(p)
+                    .arg("status")
+                    .output();
+
+                if let Ok(out) = status_out {
+                    let st = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    if st == "Playing" {
+                        active = Some(p.clone());
+                        break;
+                    }
+                }
+            }
+
+            let Some(active_player) = active else {
+                // niente player in play
+                continue;
+            };
+
+            // 3. Se è cambiato il player attivo → forziamo reload metadata
+            let force_update = active_player != last_active_player;
+            if force_update {
+                last_active_player = active_player.clone();
+            }
+
+            // 4. Leggi metadata dal player attivo
+            let title = pc_meta(&active_player, "title");
+            let artist = pc_meta(&active_player, "artist");
+            let album = pc_meta(&active_player, "album");
+            let duration_raw = pc_template(&active_player, "{{mpris:length}}");
+            let len_secs = duration_raw.as_u64() / 1_000_000.0;
+
+            let duration_secs = duration_raw
+                .parse::<f64>()
+                .unwrap_or(0.0) / 1_000_000.0;
+
+            // Creiamo una "chiave" per capire se è cambiata la traccia
+            let track_key = format!("{}|{}|{}|{}", title, artist, album, duration_secs);
+
+            let changed = force_update || track_key != last_track_key;
+            if !changed {
+                continue;
+            }
+
+            last_track_key = track_key.clone();
+
+            // 5. Aggiorna SongState
+            let mut do_fetch = false;
+
+            if let Ok(mut s) = state.lock() {
+                let l = format!("{}|{}|{}|{}", title, artist, album, duration_secs);
+                let updated = s.update_metadata(&l);
+
+                if updated || force_update {
+                    s.lyrics.reset();
+                    do_fetch = true;
+                }
+            }
+
+            if !do_fetch {
+                continue;
+            }
+
+            // 6. Notifiche UI
+            if duration_secs < 1.0 || duration_secs > 3600.0 {
+                let _ = tx_notify.send(format!("Wrong length {duration_secs}"));
+                continue;
+            }
+            if artist.trim().is_empty() {
+                let _ = tx_notify.send("No artist".into());
+                continue;
+            }
+
+            let _ = tx_notify.send("Fetching".into());
+
+            // 7. Recupero testi (bloccante, come prima)
+            let maybe_server_response = get_song_blocking(&title, &artist, &album, duration_secs);
+
+            if let Ok(mut s) = state.lock() {
+                let status = s.apply_song_text(maybe_server_response);
+                let _ = tx_notify.send(status);
+            }
+        }
+    });
+}
+
+
+// Piccolo helper per leggere un singolo metadato
+fn pc_meta(player: &str, field: &str) -> String {
+    let out = Command::new("playerctl")
+        .arg("-p").arg(player)
+        .arg("metadata")
+        .arg(field)
+        .output();
+
+    match out {
+        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        Err(_) => "".into(),
+    }
+}
+
+fn pc_template(player: &str, field: &str) -> String {
+    let out = Command::new("playerctl")
+        .arg("-p").arg(player)
+        .arg("metadata")
+        .arg("--format")
+        .arg(field)
+        .output();
+
+    match out {
+        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        Err(_) => "".into(),
+    }
 }
