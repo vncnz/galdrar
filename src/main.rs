@@ -133,7 +133,11 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
         if songinfo.lyrics.lines.len() > 0 && (time_changed || text_changed || lyrics_updated) {
             // rendered_text = lyrics.style_text(songinfo.pos_secs + (time_offset as f64 / 1000.0));
             let new_pos = songinfo.pos_secs + (time_offset as f64 / 1000.0);
-            songinfo.lyrics.update_style_text(new_pos);
+            if (songinfo.lyrics.update_style_text(new_pos)) {
+                // vertical_scroll = vertical_scroll.saturating_add(1);
+                // vertical_scroll_state = vertical_scroll_state.position(vertical_scroll);
+                vertical_scroll = if songinfo.lyrics.rendered_index > 15 { songinfo.lyrics.rendered_index - 15 } else { 0 };
+            }
         } else {
             // last_text = "No need to refresh".to_string();
         }

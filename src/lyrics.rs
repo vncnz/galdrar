@@ -60,11 +60,14 @@ impl Lyrics {
         }
     }
 
-    pub fn update_style_text(&mut self, position_secs: f64) {
+    pub fn update_style_text(&mut self, position_secs: f64) -> bool {
         if let Some((t, idx)) = self.style_text(position_secs) {
             self.rendered_text = t;
+            let changed = self.rendered_index < idx;
             self.rendered_index = idx;
+            return changed;
         }
+        false
     }
 
     pub fn set_text(&mut self, lines: Vec<LyricLine>) {
