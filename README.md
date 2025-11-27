@@ -14,7 +14,7 @@ Lyrics are downloaded from [lrclib](https://lrclib.net) APIs.
 - q or Esc: exit
 
 ## TODO
-- Consider autoscroll implementing
+- ~~Consider autoscroll implementing~~ Done!
 - Consider multi-player management
 
 ## Known bug (to be fixed soon)

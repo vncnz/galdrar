@@ -35,6 +35,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
     terminal.clear()?;
     let mut vertical_scroll: usize = 0;
     let mut vertical_scroll_state = ScrollbarState::new(10);
+    let mut autoscroll = true;
 
     let mut time_offset = 0.0;
 
@@ -52,6 +53,9 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                         terminal.show_cursor()?;
 
                         return Ok(());
+                    },
+                    KeyCode::Char('a') => {
+                        autoscroll = !autoscroll;
                     },
                     KeyCode::Down => {
                         vertical_scroll = vertical_scroll.saturating_add(1);
@@ -134,9 +138,9 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             // rendered_text = lyrics.style_text(songinfo.pos_secs + (time_offset as f64 / 1000.0));
             let new_pos = songinfo.pos_secs + (time_offset as f64 / 1000.0);
             if (songinfo.lyrics.update_style_text(new_pos)) {
-                // vertical_scroll = vertical_scroll.saturating_add(1);
-                // vertical_scroll_state = vertical_scroll_state.position(vertical_scroll);
-                vertical_scroll = if songinfo.lyrics.rendered_index > 15 { songinfo.lyrics.rendered_index - 15 } else { 0 };
+                if autoscroll {
+                    vertical_scroll = if songinfo.lyrics.rendered_index > 15 { songinfo.lyrics.rendered_index - 15 } else { 0 };
+                }
             }
         } else {
             // last_text = "No need to refresh".to_string();
@@ -154,7 +158,8 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 ])
                 .split(f.area());
 
-            let hints = Paragraph::new("   LEFT/RIGHT ARROW: ±0.5s   UP/DOWN ARROW: scroll").block(Block::default());
+            let autoscroll_str = if autoscroll { "ON" } else { "OFF" };
+            let hints = Paragraph::new(format!("[Autoscroll {autoscroll_str}]  ---  LEFT/RIGHT ARROW: ±0.5s   UP/DOWN ARROW: scroll")).block(Block::default());
 
             let block_info = Block::default().title("Playerctl Output").borders(Borders::ALL);
             let block = Block::default().title("Lyrics").borders(Borders::ALL);
