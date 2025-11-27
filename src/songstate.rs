@@ -324,19 +324,8 @@ pub fn listen_to_playerctl(
                 last_active_player = active_player.clone();
             }
 
-            // 4. Leggi metadata dal player attivo
-            let title = pc_meta(&active_player, "title");
-            let artist = pc_meta(&active_player, "artist");
-            let album = pc_meta(&active_player, "album");
-            let duration_raw = pc_template(&active_player, "{{mpris:length}}");
-            let len_secs = duration_raw.as_u64() / 1_000_000.0;
-
-            let duration_secs = duration_raw
-                .parse::<f64>()
-                .unwrap_or(0.0) / 1_000_000.0;
-
             // Creiamo una "chiave" per capire se è cambiata la traccia
-            let track_key = format!("{}|{}|{}|{}", title, artist, album, duration_secs);
+            let track_key = pc_allmeta(&active_player); // format!("{}|{}|{}|{}", title, artist, album, duration_raw);
 
             let changed = force_update || track_key != last_track_key;
             if !changed {
@@ -348,11 +337,20 @@ pub fn listen_to_playerctl(
             // 5. Aggiorna SongState
             let mut do_fetch = false;
 
+            // 4. Leggi metadata dal player attivo
+            let mut title: String = "".into();
+            let mut artist = pc_meta(&active_player, "artist");
+            let mut album = pc_meta(&active_player, "album");
+            let mut duration_secs = 0.0;
+
             if let Ok(mut s) = state.lock() {
-                let l = format!("{}|{}|{}|{}", title, artist, album, duration_secs);
-                let updated = s.update_metadata(&l);
+                let updated = s.update_metadata(&track_key);
 
                 if updated || force_update {
+                    title = s.title.clone();
+                    artist = s.artist.clone();
+                    album = s.album.clone();
+                    duration_secs = s.len_secs;
                     s.lyrics.reset();
                     do_fetch = true;
                 }
@@ -385,8 +383,22 @@ pub fn listen_to_playerctl(
     });
 }
 
+// Helper for all metadata
+fn pc_allmeta(player: &str) -> String {
+    let out = Command::new("playerctl")
+        .arg("-p").arg(player)
+        .arg("metadata")
+        .arg("--format")
+        .arg("{{title}}|{{artist}}|{{album}}|{{mpris:length}}")
+        .output();
 
-// Piccolo helper per leggere un singolo metadato
+    match out {
+        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_string(),
+        Err(_) => "".into(),
+    }
+}
+
+// Helper for single metadata item
 fn pc_meta(player: &str, field: &str) -> String {
     let out = Command::new("playerctl")
         .arg("-p").arg(player)
