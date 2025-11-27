@@ -145,9 +145,12 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 .constraints(vec![
                     Constraint::Length(6),
                     Constraint::Min(5),
-                    Constraint::Length(3)
+                    Constraint::Length(3),
+                    Constraint::Length(1)
                 ])
                 .split(f.area());
+
+            let hints = Paragraph::new("   LEFT/RIGHT ARROW: ±0.5s   UP/DOWN ARROW: scroll").block(Block::default());
 
             let block_info = Block::default().title("Playerctl Output").borders(Borders::ALL);
             let block = Block::default().title("Lyrics").borders(Borders::ALL);
@@ -169,6 +172,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
                 f.render_widget(paragraph_info, layout[0]);
                 f.render_widget(paragraph, layout[1]);
                 f.render_widget(paragraph_log, layout[2]);
+                f.render_widget(hints, layout[3]);
                 f.render_stateful_widget(
                     Scrollbar::new(ScrollbarOrientation::VerticalRight)
                         .begin_symbol(Some("↑"))
@@ -179,6 +183,7 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 let paragraph_nodata = Paragraph::new("No data").block(block_log);
                 f.render_widget(paragraph_nodata, layout[2]);
+                f.render_widget(hints, layout[3]);
             }
         })?;
 
