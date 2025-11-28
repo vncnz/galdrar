@@ -19,4 +19,4 @@ Lyrics are downloaded from [lrclib](https://lrclib.net) APIs.
 
 ## Known bug (to be fixed soon)
 - Manage the case syncedLyrics is null and plainLyrics is not null (now panics!)
-- The loaded lyrics is shown when time reaches the first line
+- ~~The loaded lyrics is shown when time reaches the first line~~ Fixed!

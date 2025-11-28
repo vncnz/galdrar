@@ -124,26 +124,20 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             vertical_scroll_state = vertical_scroll_state.content_length(songinfo.lyrics.lines.len());
         }
 
-        
-        /* while let Ok(lines) = rx_lyrics.try_recv() {
-            songinfo.lyrics.set_text(lines);
-            lyrics_updated = true;
-            // status = format!("Lyrics update received ({} lines)", lyrics.lines.len());
-        } */
         let time_changed = songinfo.check_and_update_position();
-        // let len = songinfo.check_length();
-        // log_to_file(format!("len {len:?}"));
 
         if songinfo.lyrics.lines.len() > 0 && (time_changed || text_changed || lyrics_updated) {
-            // rendered_text = lyrics.style_text(songinfo.pos_secs + (time_offset as f64 / 1000.0));
+            log_to_file(format!("Refresh! {time_changed} {text_changed} {lyrics_updated}"));
             let new_pos = songinfo.pos_secs + (time_offset as f64 / 1000.0);
-            if (songinfo.lyrics.update_style_text(new_pos)) {
+            if songinfo.lyrics.update_style_text(new_pos) {
+                log_to_file(format!("Text style updated"));
                 if autoscroll {
                     vertical_scroll = if songinfo.lyrics.rendered_index > 15 { songinfo.lyrics.rendered_index - 15 } else { 0 };
                 }
             }
         } else {
             // last_text = "No need to refresh".to_string();
+            // log_to_file(format!("No need to refresh {time_changed} {text_changed} {lyrics_updated}"));
         }
 
         let status_clone = status.clone();
@@ -164,8 +158,6 @@ fn main1() -> Result<(), Box<dyn std::error::Error>> {
             let block_info = Block::default().title("Playerctl Output").borders(Borders::ALL);
             let block = Block::default().title("Lyrics").borders(Borders::ALL);
             let block_log = Block::default().title("Status").borders(Borders::ALL);
-            // let paragraph = Paragraph::new(lines.clone().join("\n")).block(block);
-            // '{{title}}|{{artist}}|{{album}}|{{mpris:length}}|{{position}}'
             if songinfo.title != "" {
                 let perc_100 = songinfo.percentage * 100.0;
                 let offset_secs = time_offset / 1000.0;

@@ -37,11 +37,12 @@ impl Lyrics {
             .rev()
             .find(|(_, line)| (line.seconds as f64) <= position_secs)
             .map(|(i, _)| i)
-            .unwrap_or(1000000)
+            .unwrap_or(0)
     }
 
     fn style_text(&mut self, position_secs: f64) -> Option<(Vec<ratatui::text::Line<'static>>, usize)> {
         let current_index = self.current_lyric_index(position_secs);
+        log_to_file(format!("{current_index} {}", self.rendered_index));
         if current_index != self.rendered_index {
             let lines: Vec<Line> = self.lines.iter().enumerate().map(|(i, line)| {
                 let style = if i == current_index {
