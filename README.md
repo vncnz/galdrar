@@ -6,6 +6,7 @@ Please note that this is a personal project, for personal use, developed in my (
 
 ## Notes
 This program logs to file, because the terminal output is used by TUI. The file path is /tmp/galdrar.log
+
 Lyrics are downloaded from [lrclib](https://lrclib.net) APIs.
 
 ## Usage
